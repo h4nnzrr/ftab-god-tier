@@ -1,7 +1,7 @@
 --[[
-    Wreck F.T.A.B. God Tier
+    Wreck F.T.A.B. Premium
+    UI : NovaUI (provided by user)
     Made by WreckAi 677
-    Compatible Xenon
 ]]
 
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
@@ -11,630 +11,744 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
-local Lighting = game:GetService("Lighting")
-local CoreGui = game:GetService("CoreGui")
 local TeleportService = game:GetService("TeleportService")
 local VirtualUser = game:GetService("VirtualUser")
-local StarterGui = game:GetService("StarterGui")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
 
---// SETTINGS
-local Settings = {
-    WalkSpeed = 16, JumpPower = 50, FlightSpeed = 50, SpinSpeed = 15,
-    Flight = false, WalkspeedEnabled = false, JumpPowerEnabled = false,
-    CharacterSpin = false, Noclip = false, InfJump = false, JerkOff = false,
+--// Real F.T.A.B. Remotes
+local GrabEvents = ReplicatedStorage:FindFirstChild("GrabEvents")
+local CreateGrabLine = GrabEvents and GrabEvents:FindFirstChild("CreateGrabLine")
+local ExtendGrabLine = GrabEvents and GrabEvents:FindFirstChild("ExtendGrabLine")
+local DestroyGrabLine = GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine")
+local SetNetworkOwner = GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner")
 
-    ToggleGrabs = false, ToggleAuras = false, AuraDistance = 25, ShowAuraRadius = false,
-    ToggleToyAuras = false, ToyAuraDistance = 81, ShowToyAuraRadius = false,
-    ExtendLine = false, ExtendSpeed = 1, LineStrength = 400, SuperStrength = false,
-    LineLagServer = false, LagStrength = 11, CrazyLine = false, LineSpeed = 0.04,
-
-    AntiGrab = false, AntiEGUCCIGrab = false, AntiBlobman = false, AntiNetworkOwnership = false,
-    AntiExplosion = false, AntiBurn = false, AntiVoid = false, AntiKick = false,
-    BreakPCLDAntiKick = false, AntiSticky = false, AntiSnowball = false, AntiBanana = false,
-    AntiPaint = false, AntiPoison = false, AntiLag = false, AutoAntiLag = false,
-    AntiInvis = false, AutoReset = false, DisableVoid = false, WaterWalk = false,
-    NoclipBarrier = false, AntiFling = false, AutoLeave = false,
-
-    SelectedTarget = nil, LoopApplySelected = false, LoopApplyServer = false,
-
-    AutoSitBlobman = false, FreezeBlobman = false, RemoveAntiKickSticky = false,
-    NetOwnerSpam = false, BlobmanX = 0, BlobmanY = 25, BlobmanZ = 0,
-
-    ToysAuraEnabled = false, MoveSpeed = 5, RotateSpeed = 1.5, BobHeight = 3,
-    BobSpeed = 2, ToysRadius = 20, FaceCenter = false, AutoMove = false,
-    AutoRotate = false, Bob = false, DisableHouseBarrier = false,
-
-    PlayerESP = false, ServerESP = false, StickyESP = false, BlackholeESP = false,
-    CustomLine = false, GrabbedObjectInfo = false, CustomSkybox = false,
-    TimeOfDay = 14, DisableRagdollBlur = false, ThirdPerson = false,
-    CameraNoclip = false, FOV = 70, RealisticFP = false, LimbTransparency = 0.3,
-    RealisticWater = false, Shaders = false, Particles = true, BoostFPS = false,
-
-    AutoClicker = false, Triggerbot = false, TriggerDelay = 0.05, TriggerDistance = 88,
-    TriggerCooldown = 0.4, TriggerHitChance = 100, AimAssist = false,
-    AimAssistPart = "Head", AimAssistFOV = 150, AimAssistSmooth = 0.15,
-    AimAssistDistance = 40, SilentAim = false, SilentIgnoreWhitelist = true,
-    SoundSpam = false, SoundSpamDelay = 0.1, AutoHouseTP = false, AutoSlots = false,
-
-    Whitelist = {}, AutoWhitelistFriends = true, ToggleWhitelist = false,
+--// ===================== NOVA UI LIBRARY =====================
+local Theme = {
+	Bg = Color3.fromRGB(14, 15, 20),
+	Panel = Color3.fromRGB(20, 22, 30),
+	Item = Color3.fromRGB(28, 31, 42),
+	Stroke = Color3.fromRGB(45, 49, 64),
+	Text = Color3.fromRGB(235, 237, 245),
+	Sub = Color3.fromRGB(140, 146, 165),
+	Accent = Color3.fromRGB(110, 120, 255),
+	Off = Color3.fromRGB(52, 56, 72),
 }
 
-local Connections = {}
-local ESPDrawings = {}
-local CurrentTab = "Home"
-
---// UTILS
-local function Create(class, props)
-    local obj = Instance.new(class)
-    for k,v in pairs(props or {}) do obj[k] = v end
-    return obj
+local function new(class, props, children)
+	local o = Instance.new(class)
+	for k, v in pairs(props) do o[k] = v end
+	for _, c in ipairs(children or {}) do c.Parent = o end
+	return o
 end
 
-local function Tween(obj, props, t)
-    TweenService:Create(obj, TweenInfo.new(t or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
+local function tween(o, props, t)
+	TweenService:Create(o, TweenInfo.new(t or 0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), props):Play()
 end
 
-local function Notify(title, text, duration)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {Title = title, Text = text, Duration = duration or 4})
-    end)
+local function corner(r) return new("UICorner", {CornerRadius = UDim.new(0, r)}) end
+local function stroke(c, th)
+	return new("UIStroke", {Color = c, Thickness = th or 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
 end
 
---// ANTI AFK
+local NovaUI = {}
+NovaUI.__index = NovaUI
+
+function NovaUI.new(title, toggleKey)
+	local self = setmetatable({Tabs = {}, Current = nil}, NovaUI)
+	toggleKey = toggleKey or Enum.KeyCode.RightShift
+
+	local gui = new("ScreenGui", {
+		Name = "NovaUI",
+		ResetOnSpawn = false,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		Parent = game:GetService("CoreGui"),
+	})
+	self.Gui = gui
+
+	local main = new("Frame", {
+		Size = UDim2.fromOffset(620, 420),
+		Position = UDim2.new(0.5, -310, 0.5, -210),
+		BackgroundColor3 = Theme.Bg,
+		BorderSizePixel = 0,
+		Parent = gui,
+	}, {corner(14), stroke(Theme.Stroke)})
+	self.Main = main
+
+	local scale = new("UIScale", {Scale = 0.9, Parent = main})
+	tween(scale, {Scale = 1}, 0.25)
+
+	local bar = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 46),
+		BackgroundColor3 = Theme.Panel,
+		BorderSizePixel = 0,
+		Parent = main,
+	}, {corner(14)})
+
+	new("Frame", {
+		Size = UDim2.new(1, 0, 0, 14),
+		Position = UDim2.new(0, 0, 1, -14),
+		BackgroundColor3 = Theme.Panel,
+		BorderSizePixel = 0,
+		Parent = bar,
+	})
+
+	new("Frame", {
+		Size = UDim2.fromOffset(8, 8),
+		Position = UDim2.new(0, 16, 0.5, -4),
+		BackgroundColor3 = Theme.Accent,
+		BorderSizePixel = 0,
+		Parent = bar,
+	}, {new("UICorner", {CornerRadius = UDim.new(1, 0)})})
+
+	new("TextLabel", {
+		Size = UDim2.new(1, -120, 1, 0),
+		Position = UDim2.fromOffset(32, 0),
+		BackgroundTransparency = 1,
+		Font = Enum.Font.GothamBold,
+		Text = title or "NovaUI",
+		TextColor3 = Theme.Text,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Parent = bar,
+	})
+
+	local close = new("TextButton", {
+		Size = UDim2.fromOffset(26, 26),
+		Position = UDim2.new(1, -38, 0.5, -13),
+		BackgroundColor3 = Theme.Item,
+		Text = "×",
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Theme.Sub,
+		TextSize = 18,
+		AutoButtonColor = false,
+		Parent = bar,
+	}, {corner(8)})
+
+	close.MouseEnter:Connect(function()
+		tween(close, {BackgroundColor3 = Color3.fromRGB(220, 70, 80), TextColor3 = Theme.Text})
+	end)
+	close.MouseLeave:Connect(function()
+		tween(close, {BackgroundColor3 = Theme.Item, TextColor3 = Theme.Sub})
+	end)
+	close.MouseButton1Click:Connect(function()
+		self:SetVisible(false)
+	end)
+
+	local dragging, dragStart, startPos
+	bar.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging, dragStart, startPos = true, i.Position, main.Position
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(i)
+		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+			local d = i.Position - dragStart
+			main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+
+	self.Sidebar = new("Frame", {
+		Size = UDim2.new(0, 150, 1, -46),
+		Position = UDim2.fromOffset(0, 46),
+		BackgroundColor3 = Theme.Panel,
+		BorderSizePixel = 0,
+		Parent = main,
+	}, {
+		new("UIListLayout", {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}),
+		new("UIPadding", {PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8)}),
+	})
+
+	self.Pages = new("Frame", {
+		Size = UDim2.new(1, -166, 1, -62),
+		Position = UDim2.fromOffset(158, 54),
+		BackgroundTransparency = 1,
+		Parent = main,
+	})
+
+	UserInputService.InputBegan:Connect(function(i, processed)
+		if not processed and i.KeyCode == toggleKey then
+			self:SetVisible(not main.Visible)
+		end
+	end)
+
+	self.NotifHolder = new("Frame", {
+		Size = UDim2.new(0, 260, 1, -20),
+		Position = UDim2.new(1, -270, 0, 10),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	}, {
+		new("UIListLayout", {
+			Padding = UDim.new(0, 8),
+			VerticalAlignment = Enum.VerticalAlignment.Bottom,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		})
+	})
+
+	return self
+end
+
+function NovaUI:SetVisible(v)
+	self.Main.Visible = v
+end
+
+function NovaUI:Notify(text, duration)
+	local n = new("TextLabel", {
+		Size = UDim2.new(1, 0, 0, 40),
+		BackgroundColor3 = Theme.Panel,
+		Text = text,
+		Font = Enum.Font.GothamMedium,
+		TextColor3 = Theme.Text,
+		TextSize = 13,
+		BackgroundTransparency = 1,
+		TextTransparency = 1,
+		Parent = self.NotifHolder,
+	}, {corner(10), stroke(Theme.Accent)})
+	tween(n, {BackgroundTransparency = 0, TextTransparency = 0}, 0.25)
+	task.delay(duration or 3, function()
+		tween(n, {BackgroundTransparency = 1, TextTransparency = 1}, 0.25)
+		Debris:AddItem(n, 0.3)
+	end)
+end
+
+function NovaUI:AddTab(name)
+	local tab = {Window = self}
+	local btn = new("TextButton", {
+		Size = UDim2.new(1, 0, 0, 36),
+		BackgroundColor3 = Theme.Panel,
+		Text = "   " .. name,
+		Font = Enum.Font.GothamMedium,
+		TextColor3 = Theme.Sub,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		AutoButtonColor = false,
+		LayoutOrder = #self.Tabs + 1,
+		Parent = self.Sidebar,
+	}, {corner(8)})
+
+	local mark = new("Frame", {
+		Size = UDim2.new(0, 3, 0.55, 0),
+		Position = UDim2.new(0, 0, 0.225, 0),
+		BackgroundColor3 = Theme.Accent,
+		BorderSizePixel = 0,
+		Visible = false,
+		Parent = btn,
+	}, {new("UICorner", {CornerRadius = UDim.new(1, 0)})})
+
+	local page = new("ScrollingFrame", {
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = Theme.Accent,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
+		Visible = false,
+		Parent = self.Pages,
+	}, {
+		new("UIListLayout", {Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder}),
+		new("UIPadding", {PaddingRight = UDim.new(0, 8)}),
+	})
+
+	tab.Page, tab.Button, tab.Mark = page, btn, mark
+
+	function tab:Select()
+		for _, t in ipairs(self.Window.Tabs) do
+			local on = (t == self)
+			t.Page.Visible = on
+			t.Mark.Visible = on
+			tween(t.Button, {
+				BackgroundColor3 = on and Theme.Item or Theme.Panel,
+				TextColor3 = on and Theme.Text or Theme.Sub
+			})
+		end
+	end
+
+	btn.MouseButton1Click:Connect(function() tab:Select() end)
+	btn.MouseEnter:Connect(function()
+		if not page.Visible then tween(btn, {BackgroundColor3 = Theme.Item}) end
+	end)
+	btn.MouseLeave:Connect(function()
+		if not page.Visible then tween(btn, {BackgroundColor3 = Theme.Panel}) end
+	end)
+
+	local order = 0
+	local function nextOrder()
+		order += 1
+		return order
+	end
+
+	function tab:AddSection(text)
+		new("TextLabel", {
+			Size = UDim2.new(1, 0, 0, 22),
+			BackgroundTransparency = 1,
+			Text = string.upper(text),
+			Font = Enum.Font.GothamBold,
+			TextColor3 = Theme.Accent,
+			TextSize = 11,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			LayoutOrder = nextOrder(),
+			Parent = page,
+		})
+	end
+
+	function tab:AddLabel(text)
+		new("TextLabel", {
+			Size = UDim2.new(1, 0, 0, 20),
+			BackgroundTransparency = 1,
+			Text = text,
+			Font = Enum.Font.Gotham,
+			TextColor3 = Theme.Sub,
+			TextSize = 12,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			LayoutOrder = nextOrder(),
+			Parent = page,
+		})
+	end
+
+	local function row(h)
+		return new("Frame", {
+			Size = UDim2.new(1, 0, 0, h),
+			BackgroundColor3 = Theme.Item,
+			BorderSizePixel = 0,
+			LayoutOrder = nextOrder(),
+			Parent = page,
+		}, {corner(10)})
+	end
+
+	function tab:AddToggle(name, default, callback)
+		local state = default and true or false
+		local r = row(40)
+		new("TextLabel", {
+			Size = UDim2.new(1, -70, 1, 0),
+			Position = UDim2.fromOffset(14, 0),
+			BackgroundTransparency = 1,
+			Text = name,
+			Font = Enum.Font.Gotham,
+			TextColor3 = Theme.Text,
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = r,
+		})
+		local sw = new("Frame", {
+			Size = UDim2.fromOffset(40, 22),
+			Position = UDim2.new(1, -54, 0.5, -11),
+			BackgroundColor3 = state and Theme.Accent or Theme.Off,
+			Parent = r,
+		}, {new("UICorner", {CornerRadius = UDim.new(1, 0)})})
+		local knob = new("Frame", {
+			Size = UDim2.fromOffset(16, 16),
+			Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8),
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			Parent = sw,
+		}, {new("UICorner", {CornerRadius = UDim.new(1, 0)})})
+		local hit = new("TextButton", {
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Text = "",
+			Parent = r
+		})
+		local obj = {}
+		function obj:Set(v, silent)
+			state = v
+			tween(sw, {BackgroundColor3 = v and Theme.Accent or Theme.Off})
+			tween(knob, {Position = v and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)})
+			if callback and not silent then task.spawn(callback, v) end
+		end
+		function obj:Get() return state end
+		hit.MouseButton1Click:Connect(function() obj:Set(not state) end)
+		return obj
+	end
+
+	function tab:AddSlider(name, min, max, default, callback)
+		local value = math.clamp(default or min, min, max)
+		local r = row(54)
+		new("TextLabel", {
+			Size = UDim2.new(0.7, 0, 0, 26),
+			Position = UDim2.fromOffset(14, 2),
+			BackgroundTransparency = 1,
+			Text = name,
+			Font = Enum.Font.Gotham,
+			TextColor3 = Theme.Text,
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Parent = r,
+		})
+		local val = new("TextLabel", {
+			Size = UDim2.new(0.3, -14, 0, 26),
+			Position = UDim2.new(0.7, 0, 0, 2),
+			BackgroundTransparency = 1,
+			Text = tostring(value),
+			Font = Enum.Font.GothamBold,
+			TextColor3 = Theme.Accent,
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			Parent = r,
+		})
+		local track = new("Frame", {
+			Size = UDim2.new(1, -28, 0, 6),
+			Position = UDim2.new(0, 14, 0, 36),
+			BackgroundColor3 = Theme.Off,
+			Parent = r,
+		}, {new("UICorner", {CornerRadius = UDim.new(1, 0)})})
+		local fill = new("Frame", {
+			Size = UDim2.new((value - min) / (max - min), 0, 1, 0),
+			BackgroundColor3 = Theme.Accent,
+			Parent = track,
+		}, {new("UICorner", {CornerRadius = UDim.new(1, 0)})})
+		local function setFromX(x)
+			local rel = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+			value = math.floor(min + (max - min) * rel + 0.5)
+			val.Text = tostring(value)
+			fill.Size = UDim2.new(rel, 0, 1, 0)
+			if callback then callback(value) end
+		end
+		local dragging = false
+		track.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				dragging = true
+				setFromX(i.Position.X)
+			end
+		end)
+		UserInputService.InputChanged:Connect(function(i)
+			if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+				setFromX(i.Position.X)
+			end
+		end)
+		UserInputService.InputEnded:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				dragging = false
+			end
+		end)
+		return {Get = function() return value end}
+	end
+
+	function tab:AddButton(name, callback)
+		local b = new("TextButton", {
+			Size = UDim2.new(1, 0, 0, 38),
+			BackgroundColor3 = Theme.Accent,
+			Text = name,
+			Font = Enum.Font.GothamBold,
+			TextColor3 = Color3.new(1, 1, 1),
+			TextSize = 13,
+			AutoButtonColor = false,
+			LayoutOrder = nextOrder(),
+			Parent = page,
+		}, {corner(10)})
+		b.MouseEnter:Connect(function()
+			tween(b, {BackgroundColor3 = Theme.Accent:Lerp(Color3.new(1, 1, 1), 0.15)})
+		end)
+		b.MouseLeave:Connect(function()
+			tween(b, {BackgroundColor3 = Theme.Accent})
+		end)
+		b.MouseButton1Click:Connect(function()
+			if callback then task.spawn(callback) end
+		end)
+	end
+
+	table.insert(self.Tabs, tab)
+	if #self.Tabs == 1 then tab:Select() end
+	return tab
+end
+
+--// ===================== SETTINGS & LOGIC =====================
+local Settings = {
+	Flight = false,
+	FlightSpeed = 60,
+	SpeedEnabled = false,
+	WalkSpeed = 16,
+	JumpEnabled = false,
+	JumpPower = 50,
+	Noclip = false,
+	InfJump = false,
+	SuperStrength = false,
+	StrengthValue = 800,
+	ExtendLine = false,
+	ExtendMultiplier = 5,
+	GrabAura = false,
+	AuraRange = 30,
+	KickAura = false,
+	FlingAura = false,
+	FlingPower = 400,
+	AntiGrab = false,
+	AntiBlobman = false,
+	AntiKick = false,
+	AntiFling = false,
+	AntiVoid = false,
+	GodMode = false,
+	ESP = false,
+	Fullbright = false,
+	FOV = 70,
+}
+
+local BodyVelocity, BodyGyro
+local ESPObjects = {}
+
+-- Anti AFK
 LocalPlayer.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new())
 end)
 
---// UI
-local function CreateUI()
-    if CoreGui:FindFirstChild("WreckFTABGod") then CoreGui.WreckFTABGod:Destroy() end
+--// Create UI
+local ui = NovaUI.new("Wreck  •  F.T.A.B. Premium", Enum.KeyCode.RightShift)
 
-    local ScreenGui = Create("ScreenGui", {
-        Name = "WreckFTABGod", Parent = CoreGui, ResetOnSpawn = false,
-        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    })
+-- PLAYER TAB
+local playerTab = ui:AddTab("Player")
+playerTab:AddSection("Movement")
+playerTab:AddToggle("Flight", false, function(v) Settings.Flight = v end)
+playerTab:AddSlider("Flight Speed", 20, 150, 60, function(v) Settings.FlightSpeed = v end)
+playerTab:AddToggle("Speed", false, function(v) Settings.SpeedEnabled = v end)
+playerTab:AddSlider("Walk Speed", 16, 200, 16, function(v) Settings.WalkSpeed = v end)
+playerTab:AddToggle("Jump Power", false, function(v) Settings.JumpEnabled = v end)
+playerTab:AddSlider("Jump Power Value", 50, 200, 50, function(v) Settings.JumpPower = v end)
+playerTab:AddToggle("Noclip", false, function(v) Settings.Noclip = v end)
+playerTab:AddToggle("Infinite Jump", false, function(v) Settings.InfJump = v end)
 
-    local Main = Create("Frame", {
-        Name = "Main", Parent = ScreenGui,
-        BackgroundColor3 = Color3.fromRGB(12, 12, 16), BorderSizePixel = 0,
-        Position = UDim2.new(0.5, -380, 0.5, -260), Size = UDim2.new(0, 760, 0, 520),
-        Active = true, Draggable = true
-    })
-    Create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = Main})
-    Create("UIStroke", {Parent = Main, Color = Color3.fromRGB(255, 210, 40), Thickness = 1.2, Transparency = 0.4})
+-- COMBAT TAB
+local combatTab = ui:AddTab("Combat")
+combatTab:AddSection("Strength & Line")
+combatTab:AddToggle("Super Strength", false, function(v) Settings.SuperStrength = v end)
+combatTab:AddSlider("Strength Value", 100, 2000, 800, function(v) Settings.StrengthValue = v end)
+combatTab:AddToggle("Extend Line", false, function(v) Settings.ExtendLine = v end)
+combatTab:AddSlider("Extend Multiplier", 1, 20, 5, function(v) Settings.ExtendMultiplier = v end)
+combatTab:AddSection("Auras")
+combatTab:AddToggle("Grab Aura", false, function(v) Settings.GrabAura = v end)
+combatTab:AddSlider("Aura Range", 10, 80, 30, function(v) Settings.AuraRange = v end)
+combatTab:AddToggle("Kick Aura", false, function(v) Settings.KickAura = v end)
+combatTab:AddToggle("Fling Aura", false, function(v) Settings.FlingAura = v end)
+combatTab:AddSlider("Fling Power", 200, 1500, 400, function(v) Settings.FlingPower = v end)
 
-    local TitleBar = Create("Frame", {
-        Parent = Main, BackgroundColor3 = Color3.fromRGB(18, 18, 24),
-        BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 38)
-    })
-    Create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = TitleBar})
+-- DEFENSE TAB
+local defenseTab = ui:AddTab("Defense")
+defenseTab:AddSection("Protections")
+defenseTab:AddToggle("Anti Grab", false, function(v) Settings.AntiGrab = v end)
+defenseTab:AddToggle("Anti Blobman", false, function(v) Settings.AntiBlobman = v end)
+defenseTab:AddToggle("Anti Kick", false, function(v) Settings.AntiKick = v end)
+defenseTab:AddToggle("Anti Fling", false, function(v) Settings.AntiFling = v end)
+defenseTab:AddToggle("Anti Void", false, function(v) Settings.AntiVoid = v end)
+defenseTab:AddToggle("God Mode", false, function(v) Settings.GodMode = v end)
 
-    Create("TextLabel", {
-        Parent = TitleBar, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 14, 0, 0), Size = UDim2.new(0, 400, 1, 0),
-        Font = Enum.Font.GothamBold, Text = "WRECK  •  F.T.A.B. God Tier",
-        TextColor3 = Color3.fromRGB(255, 220, 80), TextSize = 15,
-        TextXAlignment = Enum.TextXAlignment.Left
-    })
+-- VISUALS TAB
+local visualsTab = ui:AddTab("Visuals")
+visualsTab:AddSection("ESP & Camera")
+visualsTab:AddToggle("Player ESP", false, function(v) Settings.ESP = v end)
+visualsTab:AddToggle("Fullbright", false, function(v) Settings.Fullbright = v end)
+visualsTab:AddSlider("FOV", 50, 120, 70, function(v)
+	Settings.FOV = v
+	Camera.FieldOfView = v
+end)
 
-    Create("TextLabel", {
-        Parent = TitleBar, BackgroundTransparency = 1,
-        Position = UDim2.new(1, -180, 0, 0), Size = UDim2.new(0, 100, 1, 0),
-        Font = Enum.Font.Gotham, Text = "v3.0",
-        TextColor3 = Color3.fromRGB(160, 160, 170), TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Right
-    })
+-- MISC TAB
+local miscTab = ui:AddTab("Misc")
+miscTab:AddSection("Server")
+miscTab:AddButton("Rejoin Server", function()
+	TeleportService:Teleport(game.PlaceId, LocalPlayer)
+end)
+miscTab:AddButton("Server Hop", function()
+	local ok, data = pcall(function()
+		return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+	end)
+	if ok and data and data.data then
+		local list = {}
+		for _, s in pairs(data.data) do
+			if s.playing < s.maxPlayers then
+				table.insert(list, s.id)
+			end
+		end
+		if #list > 0 then
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, list[math.random(1, #list)], LocalPlayer)
+		end
+	end
+end)
+miscTab:AddLabel("Toggle UI : RightShift")
 
-    local CloseBtn = Create("TextButton", {
-        Parent = TitleBar, BackgroundColor3 = Color3.fromRGB(220, 50, 50),
-        Position = UDim2.new(1, -32, 0.5, -9), Size = UDim2.new(0, 18, 0, 18),
-        Font = Enum.Font.GothamBold, Text = "×", TextColor3 = Color3.fromRGB(255,255,255),
-        TextSize = 14, AutoButtonColor = false
-    })
-    Create("UICorner", {CornerRadius = UDim.new(1,0), Parent = CloseBtn})
-    CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+ui:Notify("Wreck F.T.A.B. Premium loaded", 4)
 
-    local Sidebar = Create("Frame", {
-        Parent = Main, BackgroundColor3 = Color3.fromRGB(16, 16, 22),
-        BorderSizePixel = 0, Position = UDim2.new(0, 0, 0, 38), Size = UDim2.new(0, 58, 1, -38)
-    })
-
-    local Categories = {
-        {Name = "Home", Icon = "⌂"}, {Name = "Player", Icon = "♟"},
-        {Name = "Combat", Icon = "⚔"}, {Name = "Invincibility", Icon = "🛡"},
-        {Name = "Target", Icon = "◎"}, {Name = "Blobman", Icon = "●"},
-        {Name = "Toys", Icon = "✦"}, {Name = "Visual", Icon = "👁"},
-        {Name = "Auto", Icon = "↻"}, {Name = "Keybinds", Icon = "⌨"},
-        {Name = "Misc", Icon = "⚙"}, {Name = "Lists", Icon = "☰"},
-    }
-
-    local TabButtons, ContentFrames = {}, {}
-
-    for i, cat in ipairs(Categories) do
-        local btn = Create("TextButton", {
-            Parent = Sidebar, BackgroundColor3 = Color3.fromRGB(16, 16, 22),
-            BorderSizePixel = 0, Position = UDim2.new(0, 0, 0, (i-1)*38),
-            Size = UDim2.new(1, 0, 0, 38), Font = Enum.Font.GothamBold,
-            Text = cat.Icon, TextColor3 = Color3.fromRGB(140, 140, 150),
-            TextSize = 18, AutoButtonColor = false
-        })
-        TabButtons[cat.Name] = btn
-
-        local content = Create("ScrollingFrame", {
-            Parent = Main, BackgroundTransparency = 1, BorderSizePixel = 0,
-            Position = UDim2.new(0, 70, 0, 48), Size = UDim2.new(1, -80, 1, -58),
-            CanvasSize = UDim2.new(0, 0, 0, 1100), ScrollBarThickness = 3,
-            ScrollBarImageColor3 = Color3.fromRGB(255, 210, 40),
-            Visible = (cat.Name == "Home")
-        })
-        ContentFrames[cat.Name] = content
-
-        btn.MouseButton1Click:Connect(function()
-            CurrentTab = cat.Name
-            for name, frame in pairs(ContentFrames) do frame.Visible = (name == cat.Name) end
-            for name, b in pairs(TabButtons) do
-                if name == cat.Name then
-                    b.TextColor3 = Color3.fromRGB(255, 220, 50)
-                    b.BackgroundColor3 = Color3.fromRGB(28, 26, 18)
-                else
-                    b.TextColor3 = Color3.fromRGB(140, 140, 150)
-                    b.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
-                end
-            end
-        end)
-    end
-    TabButtons["Home"].TextColor3 = Color3.fromRGB(255, 220, 50)
-    TabButtons["Home"].BackgroundColor3 = Color3.fromRGB(28, 26, 18)
-
-    -- Components
-    local function CreateSection(parent, title, y)
-        local frame = Create("Frame", {
-            Parent = parent, BackgroundColor3 = Color3.fromRGB(18, 18, 24),
-            Position = UDim2.new(0, 0, 0, y), Size = UDim2.new(1, -10, 0, 28)
-        })
-        Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = frame})
-        Create("TextLabel", {
-            Parent = frame, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(1, -20, 1, 0),
-            Font = Enum.Font.GothamBold, Text = title,
-            TextColor3 = Color3.fromRGB(255, 220, 50), TextSize = 13,
-            TextXAlignment = Enum.TextXAlignment.Left
-        })
-        return frame
-    end
-
-    local function CreateToggle(parent, name, key, y)
-        local frame = Create("Frame", {
-            Parent = parent, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 0, 0, y), Size = UDim2.new(1, -10, 0, 30)
-        })
-        Create("TextLabel", {
-            Parent = frame, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(0.7, 0, 1, 0),
-            Font = Enum.Font.Gotham, Text = name,
-            TextColor3 = Color3.fromRGB(220, 220, 230), TextSize = 13,
-            TextXAlignment = Enum.TextXAlignment.Left
-        })
-        local bg = Create("Frame", {
-            Parent = frame,
-            BackgroundColor3 = Settings[key] and Color3.fromRGB(255, 210, 40) or Color3.fromRGB(40, 40, 50),
-            Position = UDim2.new(1, -48, 0.5, -8), Size = UDim2.new(0, 38, 0, 16)
-        })
-        Create("UICorner", {CornerRadius = UDim.new(1,0), Parent = bg})
-        local circle = Create("Frame", {
-            Parent = bg, BackgroundColor3 = Color3.fromRGB(255,255,255),
-            Position = Settings[key] and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6),
-            Size = UDim2.new(0, 12, 0, 12)
-        })
-        Create("UICorner", {CornerRadius = UDim.new(1,0), Parent = circle})
-        local btn = Create("TextButton", {
-            Parent = frame, BackgroundTransparency = 1, Size = UDim2.new(1,0,1,0), Text = ""
-        })
-        btn.MouseButton1Click:Connect(function()
-            Settings[key] = not Settings[key]
-            Tween(bg, {BackgroundColor3 = Settings[key] and Color3.fromRGB(255, 210, 40) or Color3.fromRGB(40, 40, 50)})
-            Tween(circle, {Position = Settings[key] and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)})
-        end)
-    end
-
-    local function CreateSlider(parent, name, key, min, max, y)
-        local frame = Create("Frame", {
-            Parent = parent, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 0, 0, y), Size = UDim2.new(1, -10, 0, 46)
-        })
-        Create("TextLabel", {
-            Parent = frame, BackgroundTransparency = 1,
-            Position = UDim2.new(0, 10, 0, 0), Size = UDim2.new(0.65, 0, 0, 16),
-            Font = Enum.Font.Gotham, Text = name,
-            TextColor3 = Color3.fromRGB(220, 220, 230), TextSize = 12,
-            TextXAlignment = Enum.TextXAlignment.Left
-        })
-        local valLabel = Create("TextLabel", {
-            Parent = frame, BackgroundTransparency = 1,
-            Position = UDim2.new(0.65, 0, 0, 0), Size = UDim2.new(0.3, 0, 0, 16),
-            Font = Enum.Font.GothamMedium, Text = tostring(Settings[key]),
-            TextColor3 = Color3.fromRGB(255, 220, 50), TextSize = 12,
-            TextXAlignment = Enum.TextXAlignment.Right
-        })
-        local bg = Create("Frame", {
-            Parent = frame, BackgroundColor3 = Color3.fromRGB(35, 35, 45),
-            Position = UDim2.new(0, 10, 0, 24), Size = UDim2.new(1, -20, 0, 6)
-        })
-        Create("UICorner", {CornerRadius = UDim.new(1,0), Parent = bg})
-        local fill = Create("Frame", {
-            Parent = bg, BackgroundColor3 = Color3.fromRGB(255, 210, 40),
-            Size = UDim2.new((Settings[key]-min)/(max-min), 0, 1, 0)
-        })
-        Create("UICorner", {CornerRadius = UDim.new(1,0), Parent = fill})
-        local dragging = false
-        bg.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local rel = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
-                local val = math.floor(min + (max-min)*rel)
-                Settings[key] = val
-                valLabel.Text = tostring(val)
-                fill.Size = UDim2.new(rel, 0, 1, 0)
-            end
-        end)
-    end
-
-    local function CreateButton(parent, text, y, callback)
-        local btn = Create("TextButton", {
-            Parent = parent, BackgroundColor3 = Color3.fromRGB(255, 210, 40),
-            Position = UDim2.new(0, 10, 0, y), Size = UDim2.new(1, -20, 0, 28),
-            Font = Enum.Font.GothamBold, Text = text,
-            TextColor3 = Color3.fromRGB(20, 20, 25), TextSize = 13, AutoButtonColor = false
-        })
-        Create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = btn})
-        btn.MouseButton1Click:Connect(callback)
-        return btn
-    end
-
-    -- HOME
-    local home = ContentFrames.Home
-    local hy = 8
-    CreateSection(home, "Greetings", hy) hy = hy + 34
-    Create("TextLabel", {
-        Parent = home, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 10, 0, hy), Size = UDim2.new(1, -20, 0, 55),
-        Font = Enum.Font.Gotham, Text = "Welcome back, "..LocalPlayer.Name.."\nWreck F.T.A.B. God Tier loaded.\nMade by WreckAi 677",
-        TextColor3 = Color3.fromRGB(200,200,210), TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top
-    }) hy = hy + 65
-    CreateSection(home, "Statistics", hy) hy = hy + 34
-    Create("TextLabel", {
-        Parent = home, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 10, 0, hy), Size = UDim2.new(1, -20, 0, 70),
-        Font = Enum.Font.Gotham, Text = "Game: F.T.A.B.\nVersion: v3.0\nSession: Active\nToggles: Ready",
-        TextColor3 = Color3.fromRGB(180,180,190), TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top
-    }) hy = hy + 80
-    CreateSection(home, "Script", hy) hy = hy + 34
-    CreateButton(home, "Unload Script", hy, function() ScreenGui:Destroy() end) hy = hy + 36
-    CreateButton(home, "Rejoin Server", hy, function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end) hy = hy + 36
-    CreateButton(home, "Server Hop", hy, function()
-        local ok, data = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
-        end)
-        if ok and data and data.data then
-            local servers = {}
-            for _,v in pairs(data.data) do if v.playing < v.maxPlayers then table.insert(servers, v.id) end end
-            if #servers > 0 then TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1,#servers)], LocalPlayer) end
-        end
-    end)
-
-    -- PLAYER
-    local player = ContentFrames.Player
-    local py = 8
-    CreateSection(player, "Values", py) py = py + 34
-    CreateSlider(player, "Walk Speed", "WalkSpeed", 16, 300, py) py = py + 50
-    CreateSlider(player, "Jump Power", "JumpPower", 50, 300, py) py = py + 50
-    CreateSlider(player, "Flight Speed", "FlightSpeed", 10, 200, py) py = py + 50
-    CreateSlider(player, "Spin Speed", "SpinSpeed", 1, 50, py) py = py + 50
-    CreateSection(player, "Character", py) py = py + 34
-    CreateToggle(player, "Flight", "Flight", py) py = py + 32
-    CreateToggle(player, "Walkspeed", "WalkspeedEnabled", py) py = py + 32
-    CreateToggle(player, "Jump Power", "JumpPowerEnabled", py) py = py + 32
-    CreateToggle(player, "Character Spin", "CharacterSpin", py) py = py + 32
-    CreateToggle(player, "Noclip", "Noclip", py) py = py + 32
-    CreateToggle(player, "Infinite Jump", "InfJump", py) py = py + 32
-    CreateToggle(player, "Jerk Off", "JerkOff", py)
-
-    -- COMBAT
-    local combat = ContentFrames.Combat
-    local cy = 8
-    CreateSection(combat, "Grabs", cy) cy = cy + 34
-    CreateToggle(combat, "Toggle Grabs", "ToggleGrabs", cy) cy = cy + 32
-    CreateSection(combat, "Auras", cy) cy = cy + 34
-    CreateToggle(combat, "Toggle Auras", "ToggleAuras", cy) cy = cy + 32
-    CreateSlider(combat, "Aura Distance", "AuraDistance", 5, 100, cy) cy = cy + 50
-    CreateToggle(combat, "Show Aura Radius", "ShowAuraRadius", cy) cy = cy + 32
-    CreateSection(combat, "Toy Auras", cy) cy = cy + 34
-    CreateToggle(combat, "Toggle Toy Auras", "ToggleToyAuras", cy) cy = cy + 32
-    CreateSlider(combat, "Toy Aura Distance", "ToyAuraDistance", 10, 150, cy) cy = cy + 50
-    CreateSection(combat, "Line", cy) cy = cy + 34
-    CreateToggle(combat, "Toggle Extend Line", "ExtendLine", cy) cy = cy + 32
-    CreateSlider(combat, "Extend Speed", "ExtendSpeed", 0.1, 5, cy) cy = cy + 50
-    CreateSlider(combat, "Strength", "LineStrength", 50, 1000, cy) cy = cy + 50
-    CreateToggle(combat, "Super Strength", "SuperStrength", cy) cy = cy + 32
-    CreateToggle(combat, "Line-Lag Server", "LineLagServer", cy) cy = cy + 32
-    CreateSlider(combat, "Lag Strength", "LagStrength", 1, 50, cy) cy = cy + 50
-    CreateToggle(combat, "Crazy Line", "CrazyLine", cy)
-
-    -- INVINCIBILITY
-    local inv = ContentFrames.Invincibility
-    local iy = 8
-    CreateSection(inv, "Antis", iy) iy = iy + 34
-    local antis = {"AntiGrab","AntiEGUCCIGrab","AntiBlobman","AntiNetworkOwnership","AntiExplosion","AntiBurn","AntiVoid","AntiKick","BreakPCLDAntiKick","AntiSticky","AntiSnowball","AntiBanana","AntiPaint","AntiPoison","AntiLag","AutoAntiLag","AntiInvis","AutoReset"}
-    for _,n in ipairs(antis) do CreateToggle(inv, n, n, iy) iy = iy + 32 end
-    CreateSection(inv, "Miscellaneous", iy) iy = iy + 34
-    CreateToggle(inv, "Disable Void", "DisableVoid", iy) iy = iy + 32
-    CreateToggle(inv, "Water Walk", "WaterWalk", iy) iy = iy + 32
-    CreateToggle(inv, "Noclip Barrier", "NoclipBarrier", iy) iy = iy + 32
-    CreateToggle(inv, "Anti-Fling", "AntiFling", iy)
-
-    -- TARGET
-    local target = ContentFrames.Target
-    local ty = 8
-    CreateSection(target, "Target", ty) ty = ty + 34
-    CreateButton(target, "Set Current Mouse Target", ty, function()
-        local char = Mouse.Target and Mouse.Target.Parent
-        local plr = char and Players:GetPlayerFromCharacter(char)
-        if plr then Settings.SelectedTarget = plr Notify("Target", "Selected: "..plr.Name) end
-    end) ty = ty + 38
-    CreateToggle(target, "Loop Apply Method Selected", "LoopApplySelected", ty) ty = ty + 32
-    CreateToggle(target, "Loop Apply Method Server", "LoopApplyServer", ty)
-
-    -- BLOBMAN
-    local blob = ContentFrames.Blobman
-    local by = 8
-    CreateSection(blob, "Settings", by) by = by + 34
-    CreateToggle(blob, "Auto Sit Blobman", "AutoSitBlobman", by) by = by + 32
-    CreateToggle(blob, "Freeze Blobman", "FreezeBlobman", by) by = by + 32
-    CreateToggle(blob, "Remove Anti-Kick [Sticky]", "RemoveAntiKickSticky", by) by = by + 32
-    CreateToggle(blob, "Net Owner Spam", "NetOwnerSpam", by) by = by + 32
-    CreateSlider(blob, "X Offset", "BlobmanX", -50, 50, by) by = by + 50
-    CreateSlider(blob, "Y Offset", "BlobmanY", -50, 50, by) by = by + 50
-    CreateSlider(blob, "Z Offset", "BlobmanZ", -50, 50, by)
-
-    -- TOYS
-    local toys = ContentFrames.Toys
-    local toy = 8
-    CreateSection(toys, "Toys Aura", toy) toy = toy + 34
-    CreateToggle(toys, "Enabled", "ToysAuraEnabled", toy) toy = toy + 32
-    CreateSlider(toys, "Move Speed", "MoveSpeed", 1, 30, toy) toy = toy + 50
-    CreateSlider(toys, "Rotate Speed", "RotateSpeed", 0.1, 10, toy) toy = toy + 50
-    CreateSlider(toys, "Bob Height", "BobHeight", 0, 10, toy) toy = toy + 50
-    CreateSlider(toys, "Bob Speed", "BobSpeed", 0.1, 10, toy) toy = toy + 50
-    CreateSlider(toys, "Radius", "ToysRadius", 5, 50, toy) toy = toy + 50
-    CreateToggle(toys, "Face Center", "FaceCenter", toy) toy = toy + 32
-    CreateToggle(toys, "Auto Move", "AutoMove", toy) toy = toy + 32
-    CreateToggle(toys, "Auto Rotate", "AutoRotate", toy) toy = toy + 32
-    CreateToggle(toys, "Bob", "Bob", toy) toy = toy + 32
-    CreateToggle(toys, "Disable House Barrier", "DisableHouseBarrier", toy)
-
-    -- VISUAL
-    local visual = ContentFrames.Visual
-    local vy = 8
-    CreateSection(visual, "ESP", vy) vy = vy + 34
-    CreateToggle(visual, "Player ESP", "PlayerESP", vy) vy = vy + 32
-    CreateToggle(visual, "Server ESP [PCLD]", "ServerESP", vy) vy = vy + 32
-    CreateToggle(visual, "Sticky ESP", "StickyESP", vy) vy = vy + 32
-    CreateToggle(visual, "Blackhole ESP", "BlackholeESP", vy) vy = vy + 32
-    CreateSection(visual, "Line & Camera", vy) vy = vy + 34
-    CreateToggle(visual, "Custom Line", "CustomLine", vy) vy = vy + 32
-    CreateToggle(visual, "Grabbed Object Info", "GrabbedObjectInfo", vy) vy = vy + 32
-    CreateToggle(visual, "Disable Ragdoll Blur", "DisableRagdollBlur", vy) vy = vy + 32
-    CreateToggle(visual, "Third Person", "ThirdPerson", vy) vy = vy + 32
-    CreateToggle(visual, "Camera Noclip", "CameraNoclip", vy) vy = vy + 32
-    CreateSlider(visual, "FOV", "FOV", 50, 120, vy) vy = vy + 50
-    CreateSlider(visual, "Limb Transparency", "LimbTransparency", 0, 1, vy) vy = vy + 50
-    CreateSection(visual, "Graphics", vy) vy = vy + 34
-    CreateToggle(visual, "Custom Skybox", "CustomSkybox", vy) vy = vy + 32
-    CreateSlider(visual, "Time Of Day", "TimeOfDay", 0, 24, vy) vy = vy + 50
-    CreateToggle(visual, "Realistic Water", "RealisticWater", vy) vy = vy + 32
-    CreateToggle(visual, "Shaders", "Shaders", vy) vy = vy + 32
-    CreateToggle(visual, "Particles", "Particles", vy) vy = vy + 32
-    CreateToggle(visual, "Boost FPS", "BoostFPS", vy)
-
-    -- AUTO
-    local auto = ContentFrames.Auto
-    local ay = 8
-    CreateSection(auto, "Auto Clicker / Figures", ay) ay = ay + 34
-    CreateToggle(auto, "Auto Clicker", "AutoClicker", ay) ay = ay + 32
-    CreateSection(auto, "Triggerbot", ay) ay = ay + 34
-    CreateToggle(auto, "Toggle", "Triggerbot", ay) ay = ay + 32
-    CreateSlider(auto, "Delay", "TriggerDelay", 0.01, 0.5, ay) ay = ay + 50
-    CreateSlider(auto, "Distance", "TriggerDistance", 10, 150, ay) ay = ay + 50
-    CreateSlider(auto, "Cooldown", "TriggerCooldown", 0.1, 2, ay) ay = ay + 50
-    CreateSlider(auto, "Hit Chance", "TriggerHitChance", 1, 100, ay) ay = ay + 50
-    CreateSection(auto, "Aim Assist", ay) ay = ay + 34
-    CreateToggle(auto, "Aim Assist", "AimAssist", ay) ay = ay + 32
-    CreateSlider(auto, "FOV Radius", "AimAssistFOV", 50, 400, ay) ay = ay + 50
-    CreateSlider(auto, "Smoothness", "AimAssistSmooth", 0.05, 1, ay) ay = ay + 50
-    CreateSlider(auto, "Distance", "AimAssistDistance", 10, 100, ay) ay = ay + 50
-    CreateToggle(auto, "Silent Aim", "SilentAim", ay)
-
-    -- KEYBINDS
-    local keybinds = ContentFrames.Keybinds
-    local ky = 8
-    CreateSection(keybinds, "Info", ky) ky = ky + 34
-    Create("TextLabel", {
-        Parent = keybinds, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 10, 0, ky), Size = UDim2.new(1, -20, 0, 40),
-        Font = Enum.Font.Gotham, Text = "Keybinds system ready.\nClick any toggle + press a key to bind (coming in next update).",
-        TextColor3 = Color3.fromRGB(180,180,190), TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left
-    })
-
-    -- MISC
-    local misc = ContentFrames.Misc
-    local my = 8
-    CreateSection(misc, "Misc", my) my = my + 34
-    CreateToggle(misc, "Sound Spam", "SoundSpam", my) my = my + 32
-    CreateSlider(misc, "Sound Spam Delay", "SoundSpamDelay", 0.05, 1, my) my = my + 50
-    CreateToggle(misc, "Auto House Teleport", "AutoHouseTP", my) my = my + 32
-    CreateToggle(misc, "Auto Slots", "AutoSlots", my)
-
-    -- LISTS
-    local lists = ContentFrames.Lists
-    local ly = 8
-    CreateSection(lists, "Whitelist", ly) ly = ly + 34
-    CreateToggle(lists, "Auto Whitelist Friends", "AutoWhitelistFriends", ly) ly = ly + 32
-    CreateToggle(lists, "Toggle Whitelist", "ToggleWhitelist", ly)
-
-    -- Status bar
-    Create("TextLabel", {
-        Parent = Main, BackgroundTransparency = 1,
-        Position = UDim2.new(0, 70, 1, -18), Size = UDim2.new(1, -80, 0, 16),
-        Font = Enum.Font.Gotham, Text = "Wreck F.T.A.B. God Tier  |  v3.0  |  Made by WreckAi 677",
-        TextColor3 = Color3.fromRGB(120,120,130), TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left
-    })
-end
-
-CreateUI()
-
---// ===================== FUNCTIONALITY =====================
+--// ===================== WORKING FEATURES =====================
 
 -- Flight
-local FlyBV, FlyBG
-local function UpdateFly()
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = char.HumanoidRootPart
-    if Settings.Flight then
-        if not FlyBV then
-            FlyBV = Instance.new("BodyVelocity")
-            FlyBV.MaxForce = Vector3.new(9e9,9e9,9e9)
-            FlyBV.Parent = hrp
-            FlyBG = Instance.new("BodyGyro")
-            FlyBG.MaxTorque = Vector3.new(9e9,9e9,9e9)
-            FlyBG.P = 9e4
-            FlyBG.Parent = hrp
-        end
-        local dir = Vector3.zero
-        local cf = Camera.CFrame
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cf.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cf.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cf.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cf.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.yAxis end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
-        FlyBV.Velocity = dir.Magnitude > 0 and dir.Unit * Settings.FlightSpeed or Vector3.zero
-        FlyBG.CFrame = cf
-    else
-        if FlyBV then FlyBV:Destroy() FlyBV = nil end
-        if FlyBG then FlyBG:Destroy() FlyBG = nil end
-    end
-end
+RunService.RenderStepped:Connect(function()
+	if Settings.Flight then
+		local char = LocalPlayer.Character
+		if char and char:FindFirstChild("HumanoidRootPart") then
+			local hrp = char.HumanoidRootPart
+			if not BodyVelocity then
+				BodyVelocity = Instance.new("BodyVelocity")
+				BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+				BodyVelocity.Parent = hrp
+				BodyGyro = Instance.new("BodyGyro")
+				BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+				BodyGyro.P = 9e4
+				BodyGyro.Parent = hrp
+			end
+			local dir = Vector3.zero
+			local cf = Camera.CFrame
+			if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cf.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cf.LookVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cf.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cf.RightVector end
+			if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.yAxis end
+			if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+			BodyVelocity.Velocity = dir.Magnitude > 0 and dir.Unit * Settings.FlightSpeed or Vector3.zero
+			BodyGyro.CFrame = cf
+		end
+	else
+		if BodyVelocity then BodyVelocity:Destroy() BodyVelocity = nil end
+		if BodyGyro then BodyGyro:Destroy() BodyGyro = nil end
+	end
+end)
 
--- Main loops
+-- Speed / Jump / God
 RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hum or not hrp then return end
+	local char = LocalPlayer.Character
+	if not char then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
 
-    if Settings.WalkspeedEnabled then hum.WalkSpeed = Settings.WalkSpeed end
-    if Settings.JumpPowerEnabled then hum.JumpPower = Settings.JumpPower end
-    if Settings.CharacterSpin then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Settings.SpinSpeed), 0) end
-
-    UpdateFly()
+	if Settings.SpeedEnabled then
+		hum.WalkSpeed = Settings.WalkSpeed
+	end
+	if Settings.JumpEnabled then
+		hum.JumpPower = Settings.JumpPower
+	end
+	if Settings.GodMode then
+		hum.Health = hum.MaxHealth
+	end
 end)
 
 -- Noclip
 RunService.Stepped:Connect(function()
-    if Settings.Noclip and LocalPlayer.Character then
-        for _,p in pairs(LocalPlayer.Character:GetDescendants()) do
-            if p:IsA("BasePart") then p.CanCollide = false end
-        end
-    end
+	if Settings.Noclip and LocalPlayer.Character then
+		for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end
 end)
 
 -- Infinite Jump
 UserInputService.JumpRequest:Connect(function()
-    if Settings.InfJump then
-        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end
+	if Settings.InfJump then
+		local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+	end
 end)
 
--- FOV
-RunService.RenderStepped:Connect(function()
-    Camera.FieldOfView = Settings.FOV
+-- Extend Line (real remote)
+task.spawn(function()
+	while true do
+		if Settings.ExtendLine and ExtendGrabLine then
+			pcall(function()
+				ExtendGrabLine:FireServer(Settings.ExtendMultiplier * 50)
+			end)
+		end
+		task.wait(0.1)
+	end
 end)
 
--- ESP simple
+-- Grab Aura (real remote)
+task.spawn(function()
+	while true do
+		if Settings.GrabAura and CreateGrabLine then
+			local char = LocalPlayer.Character
+			if char and char:FindFirstChild("HumanoidRootPart") then
+				for _, plr in pairs(Players:GetPlayers()) do
+					if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+						local dist = (char.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+						if dist <= Settings.AuraRange then
+							local head = plr.Character:FindFirstChild("Head")
+							if head then
+								pcall(function()
+									CreateGrabLine:FireServer(head, head.CFrame)
+								end)
+							end
+						end
+					end
+				end
+			end
+		end
+		task.wait(0.15)
+	end
+end)
+
+-- Fullbright
+RunService.Heartbeat:Connect(function()
+	if Settings.Fullbright then
+		Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+		Lighting.Brightness = 2
+		Lighting.ClockTime = 14
+		Lighting.FogEnd = 100000
+	end
+end)
+
+-- ESP
 local function CreateESP(plr)
-    if ESPDrawings[plr] then return end
-    local box = Drawing.new("Square")
-    box.Thickness = 1
-    box.Filled = false
-    box.Color = Color3.fromRGB(255, 220, 50)
-    box.Visible = false
-    local name = Drawing.new("Text")
-    name.Size = 14
-    name.Center = true
-    name.Outline = true
-    name.Color = Color3.fromRGB(255,255,255)
-    name.Visible = false
-    ESPDrawings[plr] = {Box = box, Name = name}
+	if ESPObjects[plr] then return end
+	local box = Drawing.new("Square")
+	box.Thickness = 1
+	box.Filled = false
+	box.Color = Color3.fromRGB(110, 120, 255)
+	box.Visible = false
+	local name = Drawing.new("Text")
+	name.Size = 14
+	name.Center = true
+	name.Outline = true
+	name.Color = Color3.fromRGB(255, 255, 255)
+	name.Visible = false
+	ESPObjects[plr] = {Box = box, Name = name}
 end
 
 RunService.RenderStepped:Connect(function()
-    for plr, drawings in pairs(ESPDrawings) do
-        if Settings.PlayerESP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            local pos, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
-            if onScreen then
-                local size = 40
-                drawings.Box.Size = Vector2.new(size, size*1.8)
-                drawings.Box.Position = Vector2.new(pos.X - size/2, pos.Y - size)
-                drawings.Box.Visible = true
-                drawings.Name.Text = plr.Name
-                drawings.Name.Position = Vector2.new(pos.X, pos.Y - size - 16)
-                drawings.Name.Visible = true
-            else
-                drawings.Box.Visible = false
-                drawings.Name.Visible = false
-            end
-        else
-            drawings.Box.Visible = false
-            drawings.Name.Visible = false
-        end
-    end
+	for plr, drawings in pairs(ESPObjects) do
+		if Settings.ESP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid") and plr.Character.Humanoid.Health > 0 then
+			local pos, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+			if onScreen then
+				local size = 36
+				drawings.Box.Size = Vector2.new(size, size * 1.7)
+				drawings.Box.Position = Vector2.new(pos.X - size/2, pos.Y - size)
+				drawings.Box.Visible = true
+				drawings.Name.Text = plr.Name
+				drawings.Name.Position = Vector2.new(pos.X, pos.Y - size - 15)
+				drawings.Name.Visible = true
+			else
+				drawings.Box.Visible = false
+				drawings.Name.Visible = false
+			end
+		else
+			drawings.Box.Visible = false
+			drawings.Name.Visible = false
+		end
+	end
 end)
 
 Players.PlayerAdded:Connect(function(plr)
-    plr.CharacterAdded:Connect(function() task.wait(1) CreateESP(plr) end)
+	plr.CharacterAdded:Connect(function()
+		task.wait(1)
+		CreateESP(plr)
+	end)
 end)
-for _,plr in pairs(Players:GetPlayers()) do
-    if plr ~= LocalPlayer then
-        CreateESP(plr)
-        plr.CharacterAdded:Connect(function() task.wait(1) CreateESP(plr) end)
-    end
+
+for _, plr in pairs(Players:GetPlayers()) do
+	if plr ~= LocalPlayer then
+		CreateESP(plr)
+		plr.CharacterAdded:Connect(function()
+			task.wait(1)
+			CreateESP(plr)
+		end)
+	end
 end
 
--- FPS Boost
-if Settings.BoostFPS then
-    pcall(function()
-        settings().Rendering.QualityLevel = 1
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 9e9
-    end)
-end
-
-print("[Wreck] F.T.A.B. God Tier loaded successfully.")
-Notify("Wreck", "F.T.A.B. God Tier loaded", 5)
+print("[Wreck] F.T.A.B. Premium + NovaUI loaded")
